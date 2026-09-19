@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://dokanelbalad-api.test/api/v1";
+const API_BASE_URL = "https://dokanelbalad-api-production.up.railway.app/api/v1";
 
 export interface Category {
   id: number;
