@@ -25,7 +25,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { user, token } = await loginUser({ email, password });
-            localStorage.setItem("token", token);
+      localStorage.setItem("token", token);
       localStorage.setItem("user", JSON.stringify(user));
       router.push(user.role === "admin" ? "/admin" : "/");
     } catch (err: any) {
@@ -72,9 +72,14 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold mb-1" style={{ color: COLORS.ink }}>
-              كلمة المرور
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <a href="/forgot-password" className="text-xs font-bold" style={{ color: COLORS.maroon }}>
+                نسيت كلمة السر؟
+              </a>
+              <label className="block text-sm font-bold" style={{ color: COLORS.ink }}>
+                كلمة المرور
+              </label>
+            </div>
             <input
               type="password"
               required

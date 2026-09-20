@@ -569,3 +569,33 @@ export async function getPaymentStatus(token: string, orderId: number): Promise<
   const json = await res.json();
   return json.data;
 }
+export async function forgotPassword(email: string) {
+  const res = await fetch(`${API_BASE_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "حصل خطأ");
+  }
+  return res.json();
+}
+
+export async function resetPassword(data: {
+  email: string;
+  code: string;
+  password: string;
+  password_confirmation: string;
+}) {
+  const res = await fetch(`${API_BASE_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "فشل تغيير كلمة المرور");
+  }
+  return res.json();
+}
