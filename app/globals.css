@@ -1,23 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* الخلفية والنص الأساسي */
+  --background: #FEFAF4; /* كريمي فاتح - نفس خلفية قريب */
+  --foreground: #1A1A1A; /* أسود تقريباً - للعناوين والنصوص */
+
+  /* الأخضر - اللون الأساسي للبراند (العناوين، الأزرار الثانوية، الحدود) */
+  --color-primary: #0E5D45;
+  --color-primary-dark: #0B4A38; /* للـ hover */
+  --color-primary-light: #EBF2F0; /* خلفية فاتحة جداً (صناديق الأيقونات) */
+
+  /* الأخضر المتوسط - لأيقونات الفئات تحديداً */
+  --color-icon: #246A55;
+
+  /* البرتقالي - لون التمييز (أزرار الأكشن الرئيسية، الأسعار، العروض) */
+  --color-accent: #EA730D;
+  --color-accent-dark: #D4650A; /* للـ hover */
+  --color-accent-light: #FCE8D6; /* خلفية فاتحة للبادجات البرتقالية */
+
+  /* رمادي/كريمي للكروت والحدود */
+  --color-card: #FFFFFF;
+  --color-border: #E5E0D8;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-primary: var(--color-primary);
+  --color-primary-dark: var(--color-primary-dark);
+  --color-primary-light: var(--color-primary-light);
+
+  --color-icon: var(--color-icon);
+
+  --color-accent: var(--color-accent);
+  --color-accent-dark: var(--color-accent-dark);
+  --color-accent-light: var(--color-accent-light);
+
+  --color-card: var(--color-card);
+  --color-border: var(--color-border);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* ملحوظة: شلنا وضع الدارك مود التلقائي (prefers-color-scheme) عشان
+   الموقع بتاعنا هيفضل بنفس الألوان الكريمية دايماً زي قريب، سواء
+   المستخدم شغّل الوضع الليلي في جهازه أو لأ. لو حبينا نضيف دارك مود
+   حقيقي بعدين، ده هيبقى قرار تصميم منفصل. */
 
 body {
   background: var(--background);
