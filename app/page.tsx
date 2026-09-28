@@ -2,7 +2,9 @@ import { getCategories, getProducts } from "@/app/lib/api";
 import Header from "@/app/Header";
 import Link from "next/link";
 import BrandsPanel from "@/app/BrandsPanel";
+import HomeToolbar from "@/app/HomeToolbar";
 import { BRANDS } from "@/app/lib/brands";
+import { normalizeAr } from "@/app/lib/governorates";
 
 const COLORS = {
   green: "#0E5D45",
@@ -17,6 +19,20 @@ const COLORS = {
   line: "#EDE7DC",
 };
 
+// ترتيب الفئات في الشريط (اللي مش مذكورة هنا بتيجي في الآخر)
+const CATEGORY_ORDER = [
+  "cars-motorcycles",
+  "auto-parts-oils",
+  "home-appliances",
+  "real-estate",
+  "mobiles-tablets",
+  "furniture",
+  "clothes-shoes",
+  "pets",
+  "jobs-services",
+  "other",
+];
+
 const conditionLabel: Record<string, string> = {
   new: "جديد",
   used: "مستعمل",
@@ -26,30 +42,72 @@ const conditionLabel: Record<string, string> = {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; brand?: string }>;
+  searchParams: Promise<{
+    category?: string;
+    brand?: string;
+    q?: string;
+    gov?: string;
+    sort?: string;
+  }>;
 }) {
-  const { category, brand } = await searchParams;
+  const { category, brand, q, gov, sort } = await searchParams;
   const [categories, products, dealsProducts] = await Promise.all([
     getCategories(),
     getProducts(category),
     getProducts(undefined, true),
   ]);
 
+  const rank = (slug: string) => {
+    const i = CATEGORY_ORDER.indexOf(slug);
+    return i === -1 ? 999 : i;
+  };
+  const sortedCategories = [...categories].sort((a, b) => rank(a.slug) - rank(b.slug));
+
   // فلتر الماركة: بيدور على اسم الماركة في عنوان المنتج (لحد ما نضيف حقل ماركة في الباك إند)
   const activeBrand = BRANDS.find((b) => b.slug === brand);
-  const shownProducts = activeBrand
+  let filtered = activeBrand
     ? products.filter((p) => {
         const t = String(p.title ?? "").toLowerCase();
         return activeBrand.keywords.some((k) => t.includes(k.toLowerCase()));
       })
     : products;
 
+  if (q) {
+    const nq = normalizeAr(q);
+    filtered = filtered.filter(
+      (p) =>
+        normalizeAr(String(p.title ?? "")).includes(nq) ||
+        normalizeAr(String(p.vendor?.store_name ?? "")).includes(nq)
+    );
+  }
+  if (gov) {
+    const ng = normalizeAr(gov);
+    filtered = filtered.filter((p) => normalizeAr(String(p.governorate ?? "")).includes(ng));
+  }
+  if (sort === "new") {
+    filtered = [...filtered].sort((a, b) => Number(b.id) - Number(a.id));
+  }
+  const shownProducts = filtered;
+  const hasFilters = !!(q || gov || activeBrand);
+
+  // رابط إلغاء فلتر الماركة مع الحفاظ على باقي الفلاتر
+  const clearBrandHref = (() => {
+    const p = new URLSearchParams();
+    if (category) p.set("category", category);
+    if (q) p.set("q", q);
+    if (gov) p.set("gov", gov);
+    if (sort) p.set("sort", sort);
+    const qs = p.toString();
+    return `/${qs ? `?${qs}` : ""}#products`;
+  })();
+
   return (
     <div style={{ background: COLORS.cream, minHeight: "100vh" }}>
       <Header />
+      <HomeToolbar categories={sortedCategories} />
 
       {/* Hero */}
-      <section className="relative overflow-hidden px-4 pt-12 pb-10 md:pt-16 md:pb-14">
+      <section className="relative overflow-hidden px-4 pt-8 pb-8 md:pt-10 md:pb-10">
         <div
           aria-hidden="true"
           className="absolute inset-y-0 left-0 w-full md:w-1/2 opacity-20 md:opacity-100"
@@ -76,7 +134,7 @@ export default async function Home({
             className="text-sm md:text-base mb-6"
             style={{ color: COLORS.ink, fontFamily: "var(--font-tajawal)" }}
           >
-            أي حاجه وكل حاجه، من محلات موثوقة قريبة منك
+            أي حاجه وكل حاجه، من دٌكان موثوق قريب منك
           </p>
           <a
             href="#products"
@@ -89,49 +147,6 @@ export default async function Home({
           >
             شوف المنتجات
           </a>
-        </div>
-      </section>
-
-      {/* Categories strip (scrollable) */}
-      <section className="max-w-6xl mx-auto px-4 pb-6">
-        <div
-          className="flex gap-2 overflow-x-auto pb-3 [scrollbar-width:thin] [scrollbar-color:#0E5D45_#EBF2F0]"
-          style={{ scrollSnapType: "x proximity" }}
-        >
-          {[{ id: "all", slug: "", name_ar: "الرئيسية", icon: "🏠", image_url: null as string | null }, ...categories].map(
-            (c) => {
-              const isActive = (c.slug || undefined) === category || (!c.slug && !category);
-              return (
-                <Link
-                  key={c.id}
-                  href={c.slug ? `/?category=${c.slug}` : "/"}
-                  className="shrink-0 rounded-xl px-2 py-3 flex flex-col items-center gap-1.5 text-center"
-                  style={{
-                    width: 88,
-                    scrollSnapAlign: "start",
-                    background: isActive ? COLORS.sage : "transparent",
-                  }}
-                >
-                  <span className="w-10 h-10 flex items-center justify-center text-3xl overflow-hidden">
-                    {c.image_url ? (
-                      <img src={c.image_url} alt={c.name_ar} className="w-full h-full object-cover rounded-lg" />
-                    ) : (
-                      c.icon
-                    )}
-                  </span>
-                  <span
-                    className="text-xs font-bold leading-tight"
-                    style={{
-                      color: isActive ? COLORS.green : COLORS.muted,
-                      fontFamily: "var(--font-tajawal)",
-                    }}
-                  >
-                    {c.name_ar}
-                  </span>
-                </Link>
-              );
-            }
-          )}
         </div>
       </section>
 
@@ -209,13 +224,13 @@ export default async function Home({
       {/* Products + brands sidebar */}
       <section id="products" className="max-w-6xl mx-auto px-4 py-10 scroll-mt-20">
         <div className="flex flex-col md:flex-row gap-6">
-          <BrandsPanel brands={BRANDS} activeSlug={activeBrand?.slug} category={category} />
+          <BrandsPanel brands={BRANDS} activeSlug={activeBrand?.slug} />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-5 gap-3">
               {activeBrand ? (
                 <Link
-                  href={category ? `/?category=${category}#products` : "/#products"}
+                  href={clearBrandHref}
                   scroll={false}
                   className="px-3 py-1.5 rounded-full text-xs font-bold"
                   style={{ background: COLORS.sage, color: COLORS.green }}
@@ -235,7 +250,7 @@ export default async function Home({
 
             {shownProducts.length === 0 ? (
               <p className="text-center py-10" style={{ color: COLORS.muted, fontFamily: "var(--font-tajawal)" }}>
-                {activeBrand ? `مفيش منتجات لماركة ${activeBrand.ar} لسه` : "مفيش منتجات لسه - أول منتج هيظهر هنا بمجرد ما يتضاف"}
+                {hasFilters ? "مفيش نتايج مطابقة للفلاتر دي، جرّب تغيّر البحث أو المنطقة" : "مفيش منتجات لسه - أول منتج هيظهر هنا بمجرد ما يتضاف"}
               </p>
             ) : (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-5">

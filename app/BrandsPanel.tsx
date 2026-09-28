@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import type { Brand } from "@/app/lib/brands";
 
 const COLORS = {
@@ -77,18 +78,17 @@ function BrandTile({
 export default function BrandsPanel({
   brands,
   activeSlug,
-  category,
 }: {
   brands: Brand[];
   activeSlug?: string;
-  category?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const sp = useSearchParams();
 
   const hrefFor = (slug: string) => {
-    const params = new URLSearchParams();
-    if (category) params.set("category", category);
-    if (activeSlug !== slug) params.set("brand", slug); // الضغط تاني على نفس الماركة يلغي الفلتر
+    const params = new URLSearchParams(sp.toString()); // نحافظ على الفئة والمنطقة والبحث
+    if (activeSlug === slug) params.delete("brand"); // الضغط تاني على نفس الماركة يلغي الفلتر
+    else params.set("brand", slug);
     const qs = params.toString();
     return `/${qs ? `?${qs}` : ""}#products`;
   };

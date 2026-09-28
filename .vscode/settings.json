@@ -1,0 +1,21 @@
+{
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.next/**": true,
+    "**/vendor/**": true,
+    "**/storage/logs/**": true,
+    "**/.git/objects/**": true
+  },
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/.next": true,
+    "**/vendor": true,
+    "**/storage/logs": true,
+    "**/public/brands": true
+  },
+  "files.exclude": {
+    "**/.next": true
+  },
+  "typescript.tsserver.maxTsServerMemory": 3072,
+  "css.lint.unknownAtRules": "ignore"
+}
