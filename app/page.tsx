@@ -134,7 +134,7 @@ export default async function Home({
             className="text-sm md:text-base mb-6"
             style={{ color: COLORS.ink, fontFamily: "var(--font-tajawal)" }}
           >
-            أي حاجه وكل حاجه، من دٌكان موثوق قريب منك
+            أي حاجه وكل حاجه، من محلات موثوقة قريبة منك
           </p>
           <a
             href="#products"
@@ -324,12 +324,6 @@ export default async function Home({
         </div>
       </section>
 
-      <footer
-        className="text-center text-xs py-6"
-        style={{ color: COLORS.muted, fontFamily: "var(--font-tajawal)" }}
-      >
-        © 2026 دكان البلد — كل حاجة، من كل مكان
-      </footer>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Cairo, Tajawal } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/app/context/CartContext";
+import SiteHeader from "@/app/SiteHeader";
+import SiteFooter from "@/app/SiteFooter";
 
 const cairo = Cairo({
   subsets: ["arabic", "latin"],
@@ -16,8 +18,9 @@ const tajawal = Tajawal({
 });
 
 export const metadata: Metadata = {
-  title: "دكان البلد - كل حاجة، من كل مكان",
-  description: "منصة تسوق تجمع محلات وأفراد بيبيعوا قطع غيار وزيوت عربيات في مصر",
+  title: "دكان البلد - دكانك قريب",
+  description:
+    "منصة مصرية بتوصّلك بالمحلات والبائعين القريبين منك: قطع غيار وزيوت، سيارات، عقارات، موبايلات وأكتر",
 };
 
 export default function RootLayout({
@@ -27,8 +30,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ar" dir="rtl">
-            <body className={`${cairo.variable} ${tajawal.variable} antialiased`}>
-        <CartProvider>{children}</CartProvider>
+      <body className={`${cairo.variable} ${tajawal.variable} antialiased`}>
+        <CartProvider>
+          <SiteHeader />
+          {children}
+          <SiteFooter />
+        </CartProvider>
       </body>
     </html>
   );
