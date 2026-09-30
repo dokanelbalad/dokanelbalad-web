@@ -6,11 +6,11 @@ import { getProduct, startConversation, getMessages, sendMessage, Product } from
 import { useCart } from "@/app/context/CartContext";
 
 const COLORS = {
-  maroon: "#5C121B",
-  maroonDark: "#3E0C13",
-  gold: "#C89B3C",
-  ivory: "#FBF7EF",
-  ink: "#241416",
+  maroon: "#0E5D45",
+  maroonDark: "#0B4A38",
+  gold: "#EA730D",
+  ivory: "#FEFAF4",
+  ink: "#1A1A1A",
   sand: "#8A7458",
 };
 

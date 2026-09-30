@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { getCategories, createVendorProduct, getVendorDashboard, Category } from "@/app/lib/api";
 
 const COLORS = {
-  maroon: "#5C121B",
-  maroonDark: "#3E0C13",
-  ivory: "#FBF7EF",
-  ink: "#241416",
+  maroon: "#0E5D45",
+  maroonDark: "#0B4A38",
+  ivory: "#FEFAF4",
+  ink: "#1A1A1A",
   sand: "#8A7458",
 };
 
@@ -88,7 +88,7 @@ export default function NewProductPage() {
         {commissionRate && (
           <div
             className="rounded-xl px-4 py-2.5 mb-6 text-xs font-bold text-right"
-            style={{ background: "#F5E8C8", color: "#3E0C13" }}
+            style={{ background: "#F5E8C8", color: "#0B4A38" }}
           >
             💡 عمولة المنصة على منتجاتك: {commissionRate}% — احسبها في تسعيرك
           </div>
