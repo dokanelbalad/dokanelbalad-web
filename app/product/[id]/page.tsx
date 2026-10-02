@@ -2,16 +2,27 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { getProduct, startConversation, getMessages, sendMessage, Product } from "@/app/lib/api";
+import {
+  getProduct,
+  startConversation,
+  getMessages,
+  sendMessage,
+  Product,
+  FrozenAccountError,
+} from "@/app/lib/api";
 import { useCart } from "@/app/context/CartContext";
 
 const COLORS = {
-  maroon: "#0E5D45",
-  maroonDark: "#0B4A38",
-  gold: "#EA730D",
-  ivory: "#FEFAF4",
+  green: "#0E5D45",
+  greenDark: "#0B4A38",
+  greenMid: "#246A55",
+  sage: "#EBF2F0",
+  orange: "#EA730D",
+  cream: "#FEFAF4",
   ink: "#1A1A1A",
-  sand: "#8A7458",
+  muted: "#6B7A75",
+  line: "#EDE7DC",
+  danger: "#C0392B",
 };
 
 const conditionLabel: Record<string, string> = {
@@ -35,6 +46,9 @@ export default function ProductPage() {
   const [newMessage, setNewMessage] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [chatWarning, setChatWarning] = useState("");
+  // frozenMessage جوه الشات = المستخدم مجمّد فعلياً ومش هيقدر يبعت خالص
+  const [frozenMessage, setFrozenMessage] = useState("");
 
   useEffect(() => {
     getProduct(productId)
@@ -44,6 +58,8 @@ export default function ProductPage() {
 
   async function handleOpenChat() {
     setChatError("");
+    setChatWarning("");
+    setFrozenMessage("");
     const token = localStorage.getItem("token");
     if (!token) {
       router.push("/login");
@@ -58,7 +74,11 @@ export default function ProductPage() {
       const msgs = await getMessages(token, conversation.id);
       setMessages(msgs);
     } catch (err: any) {
-      setChatError(err.message || "حصل خطأ");
+      if (err instanceof FrozenAccountError) {
+        setFrozenMessage(err.message);
+      } else {
+        setChatError(err.message || "حصل خطأ");
+      }
     } finally {
       setChatLoading(false);
     }
@@ -68,38 +88,49 @@ export default function ProductPage() {
     const token = localStorage.getItem("token");
     if (!token || !conversationId || !newMessage.trim()) return;
 
+    setChatError("");
+    setChatWarning("");
+
     try {
-      const message = await sendMessage(token, conversationId, newMessage.trim());
-      setMessages((prev) => [...prev, message]);
+      const result = await sendMessage(token, conversationId, newMessage.trim());
+      setMessages((prev) => [...prev, result.data]);
       setNewMessage("");
+      if (result.warning) {
+        setChatWarning(result.warning);
+      }
     } catch (err: any) {
-      setChatError(err.message || "فشل إرسال الرسالة");
+      if (err instanceof FrozenAccountError) {
+        setFrozenMessage(err.message);
+      } else {
+        // رسالة اتمنعت (مشاركة رقم للمرة التالتة أو الرابعة) بترجع هنا كـ Error عادي
+        setChatError(err.message || "فشل إرسال الرسالة");
+      }
     }
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: COLORS.ivory }}>
-        <p style={{ color: COLORS.maroon, fontFamily: "var(--font-tajawal)" }}>جاري التحميل...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: COLORS.cream }}>
+        <p style={{ color: COLORS.green, fontFamily: "var(--font-tajawal)" }}>جاري التحميل...</p>
       </div>
     );
   }
 
   if (!product) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: COLORS.ivory }}>
-        <p style={{ color: "#C0392B", fontFamily: "var(--font-tajawal)" }}>المنتج مش موجود</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: COLORS.cream }}>
+        <p style={{ color: COLORS.danger, fontFamily: "var(--font-tajawal)" }}>المنتج مش موجود</p>
       </div>
     );
   }
 
   return (
-    <div dir="rtl" style={{ background: COLORS.ivory, minHeight: "100vh", fontFamily: "var(--font-tajawal)" }}>
+    <div dir="rtl" style={{ background: COLORS.cream, minHeight: "100vh", fontFamily: "var(--font-tajawal)" }}>
       <div className="max-w-4xl mx-auto px-4 py-8">
         <button
           onClick={() => router.push("/")}
           className="text-sm font-bold mb-6"
-          style={{ color: COLORS.maroon }}
+          style={{ color: COLORS.green }}
         >
           → رجوع للرئيسية
         </button>
@@ -107,12 +138,12 @@ export default function ProductPage() {
         <div className="grid md:grid-cols-2 gap-8">
           <div
             className="rounded-3xl flex items-center justify-center text-9xl relative"
-            style={{ height: 340, background: `linear-gradient(160deg, ${COLORS.maroon}, ${COLORS.maroonDark})` }}
+            style={{ height: 340, background: `linear-gradient(160deg, ${COLORS.greenMid}, ${COLORS.greenDark})` }}
           >
             {Number(product.discount_percentage) > 0 && (
               <span
                 className="absolute top-3 right-3 px-2.5 py-1.5 rounded-lg text-sm font-bold"
-                style={{ background: "#C0392B", color: "white" }}
+                style={{ background: COLORS.orange, color: "white" }}
               >
                 خصم {Number(product.discount_percentage)}%
               </span>
@@ -123,7 +154,7 @@ export default function ProductPage() {
           <div className="text-right space-y-4">
             <span
               className="inline-block px-3 py-1 rounded-full text-xs font-bold"
-              style={{ background: "#F5E8C8", color: COLORS.maroonDark }}
+              style={{ background: COLORS.sage, color: COLORS.greenDark }}
             >
               {conditionLabel[product.condition]}
             </span>
@@ -134,34 +165,39 @@ export default function ProductPage() {
 
             {Number(product.discount_percentage) > 0 ? (
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="text-3xl font-extrabold" style={{ color: COLORS.maroon, fontFamily: "var(--font-cairo)" }}>
+                <span className="text-3xl font-extrabold" style={{ color: COLORS.green, fontFamily: "var(--font-cairo)" }}>
                   {Number(product.total_display_price).toLocaleString()} ج.م
                 </span>
-                <span className="text-base line-through" style={{ color: COLORS.sand }}>
+                <span className="text-base line-through" style={{ color: COLORS.muted }}>
                   {Number(product.price).toLocaleString()} ج.م
                 </span>
               </div>
             ) : (
-              <div className="text-3xl font-extrabold" style={{ color: COLORS.maroon, fontFamily: "var(--font-cairo)" }}>
+              <div className="text-3xl font-extrabold" style={{ color: COLORS.green, fontFamily: "var(--font-cairo)" }}>
                 {Number(product.total_display_price).toLocaleString()} ج.م
               </div>
             )}
             {product.display_shipping_fee > 0 && (
-              <div className="text-xs" style={{ color: COLORS.sand }}>
+              <div className="text-xs" style={{ color: COLORS.muted }}>
                 شامل {Number(product.display_shipping_fee).toLocaleString()} ج.م رسوم شحن
               </div>
             )}
 
-            <div className="rounded-2xl p-4" style={{ background: "white" }}>
+            <div className="rounded-2xl p-4" style={{ background: "white", border: `1px solid ${COLORS.line}` }}>
               <div className="font-bold" style={{ color: COLORS.ink, fontFamily: "var(--font-cairo)" }}>
                 {product.vendor?.store_name}
               </div>
-              <div className="text-xs mt-1" style={{ color: COLORS.sand }}>
+              <div className="text-xs mt-1" style={{ color: COLORS.muted }}>
                 {product.governorate}
               </div>
             </div>
 
-            <p className="text-sm leading-relaxed" style={{ color: "#5A4A3A" }}>
+            {/* تذكير: التواصل من خلال الموقع بس، حماية لحقوق البائع والمشتري */}
+            <p className="text-xs" style={{ color: COLORS.muted }}>
+              🔒 للحفاظ على حقوقك، التواصل مع البائع بيتم من خلال رسائل الموقع بس.
+            </p>
+
+            <p className="text-sm leading-relaxed" style={{ color: "#4A4A4A" }}>
               {product.description}
             </p>
             <button
@@ -171,14 +207,14 @@ export default function ProductPage() {
                 setTimeout(() => setAddedToCart(false), 2000);
               }}
               className="w-full py-3 rounded-full font-extrabold"
-              style={{ background: COLORS.maroon, color: COLORS.ivory, fontFamily: "var(--font-cairo)" }}
+              style={{ background: COLORS.orange, color: "white", fontFamily: "var(--font-cairo)" }}
             >
               {addedToCart ? "✓ تمت الإضافة للسلة" : "أضف للسلة"}
             </button>
             <button
               onClick={handleOpenChat}
               className="w-full py-3 rounded-full font-extrabold"
-              style={{ border: `2px solid ${COLORS.maroon}`, color: COLORS.maroon, fontFamily: "var(--font-cairo)" }}
+              style={{ border: `2px solid ${COLORS.green}`, color: COLORS.green, fontFamily: "var(--font-cairo)" }}
             >
               راسل البائع
             </button>
@@ -186,67 +222,88 @@ export default function ProductPage() {
         </div>
 
         {chatOpen && (
-          <div className="mt-10 rounded-3xl p-5" style={{ background: "white", boxShadow: "0 4px 16px rgba(92,18,27,0.08)" }}>
+          <div className="mt-10 rounded-3xl p-5" style={{ background: "white", boxShadow: "0 4px 16px rgba(14,93,69,0.08)" }}>
             <h2 className="font-extrabold mb-4 text-right" style={{ color: COLORS.ink, fontFamily: "var(--font-cairo)" }}>
               المحادثة مع {product.vendor?.store_name}
             </h2>
 
-            {chatError && (
-              <p className="text-sm font-bold mb-3 text-right" style={{ color: "#C0392B" }}>
-                {chatError}
-              </p>
-            )}
-
-            {chatLoading ? (
-              <p className="text-sm text-center py-6" style={{ color: COLORS.sand }}>
-                جاري التحميل...
-              </p>
+            {frozenMessage ? (
+              // الحساب مجمّد: مفيش داعي نعرض صندوق كتابة خالص، الرسالة دي كفاية
+              <div
+                className="rounded-2xl p-4 text-sm font-bold text-right"
+                style={{ background: "#FDEDEC", color: COLORS.danger }}
+              >
+                {frozenMessage}
+              </div>
             ) : (
               <>
-                <div className="space-y-2 mb-4 max-h-72 overflow-y-auto">
-                  {messages.length === 0 ? (
-                    <p className="text-sm text-center py-6" style={{ color: COLORS.sand }}>
-                      ابدأ المحادثة بسؤالك الأول
-                    </p>
-                  ) : (
-                    messages.map((m) => (
-                      <div
-                        key={m.id}
-                        className="max-w-[75%] px-4 py-2 rounded-2xl text-sm"
-                        style={{
-                          background: COLORS.ivory,
-                          marginRight: "auto",
-                          marginLeft: 0,
-                          color: COLORS.ink,
-                        }}
-                      >
-                        <div className="font-bold text-xs mb-0.5" style={{ color: COLORS.maroon }}>
-                          {m.sender?.name}
-                        </div>
-                        {m.body}
-                      </div>
-                    ))
-                  )}
-                </div>
+                {chatError && (
+                  <p className="text-sm font-bold mb-3 text-right" style={{ color: COLORS.danger }}>
+                    {chatError}
+                  </p>
+                )}
 
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
-                    placeholder="اكتب رسالتك..."
-                    className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
-                    style={{ border: "1px solid #E5D8BE" }}
-                  />
-                  <button
-                    onClick={handleSend}
-                    className="px-5 py-2.5 rounded-full font-bold text-sm"
-                    style={{ background: COLORS.maroon, color: COLORS.ivory }}
-                  >
-                    إرسال
-                  </button>
-                </div>
+                {chatLoading ? (
+                  <p className="text-sm text-center py-6" style={{ color: COLORS.muted }}>
+                    جاري التحميل...
+                  </p>
+                ) : (
+                  <>
+                    <div className="space-y-2 mb-4 max-h-72 overflow-y-auto">
+                      {messages.length === 0 ? (
+                        <p className="text-sm text-center py-6" style={{ color: COLORS.muted }}>
+                          ابدأ المحادثة بسؤالك الأول
+                        </p>
+                      ) : (
+                        messages.map((m) => (
+                          <div
+                            key={m.id}
+                            className="max-w-[75%] px-4 py-2 rounded-2xl text-sm"
+                            style={{
+                              background: COLORS.sage,
+                              marginRight: "auto",
+                              marginLeft: 0,
+                              color: COLORS.ink,
+                            }}
+                          >
+                            <div className="font-bold text-xs mb-0.5" style={{ color: COLORS.green }}>
+                              {m.sender?.name}
+                            </div>
+                            {m.body}
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {chatWarning && (
+                      <div
+                        className="rounded-xl p-3 mb-3 text-xs font-bold text-right"
+                        style={{ background: "#FCE8D6", color: "#9A4A08" }}
+                      >
+                        ⚠️ {chatWarning}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                        placeholder="اكتب رسالتك..."
+                        className="flex-1 rounded-full px-4 py-2.5 text-sm outline-none"
+                        style={{ border: `1px solid ${COLORS.line}` }}
+                      />
+                      <button
+                        onClick={handleSend}
+                        className="px-5 py-2.5 rounded-full font-bold text-sm"
+                        style={{ background: COLORS.green, color: "white" }}
+                      >
+                        إرسال
+                      </button>
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>

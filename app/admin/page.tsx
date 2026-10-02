@@ -46,6 +46,12 @@ export default function AdminPage() {
         { label: "إجمالي المستخدمين", value: overview.total_users },
         { label: "إجمالي البائعين", value: overview.total_vendors },
         { label: "بائعين قيد المراجعة", value: overview.pending_vendors, highlight: overview.pending_vendors > 0 },
+        { label: "حسابات مجمّدة", value: overview.frozen_accounts, highlight: overview.frozen_accounts > 0 },
+        {
+          label: "بيعات محتاجة مراجعة",
+          value: overview.offplatform_sales_needing_review,
+          highlight: overview.offplatform_sales_needing_review > 0,
+        },
         { label: "إجمالي المنتجات", value: overview.total_products },
         { label: "إجمالي الطلبات", value: overview.total_orders },
         {
@@ -61,6 +67,18 @@ export default function AdminPage() {
     { href: "/admin/categories", label: "إدارة التصنيفات", icon: "📂", desc: "إضافة وتعديل وحذف تصنيفات المنتجات" },
     { href: "/admin/products", label: "إدارة المنتجات", icon: "📦", desc: "تعديل تصنيف أي منتج في الموقع" },
     { href: "/admin/commissions", label: "تحصيل العمولات", icon: "💰", desc: "تحصيل رصيد العمولة المعلق من البائعين" },
+    {
+      href: "/admin/frozen-accounts",
+      label: "الحسابات المجمّدة",
+      icon: "🔒",
+      desc: "حسابات بائعين ومشترين متجمّدة، ورفع التجميد عنها",
+    },
+    {
+      href: "/admin/offplatform-sales",
+      label: "بيعات بره الموقع",
+      icon: "🤝",
+      desc: "مراجعة البيعات المعلّقة، وتدخل استثنائي لو لزم",
+    },
   ];
 
   if (loading) {
@@ -95,14 +113,14 @@ export default function AdminPage() {
           نظرة عامة
         </h1>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
           {cards.map((c) => (
             <div
               key={c.label}
               className="rounded-2xl p-5 text-right"
               style={{
                 background: "white",
-                boxShadow: "0 4px 16px rgba(92,18,27,0.08)",
+                boxShadow: "0 4px 16px rgba(14,93,69,0.08)",
                 border: c.highlight ? `2px solid ${COLORS.gold}` : "none",
               }}
             >
@@ -126,7 +144,7 @@ export default function AdminPage() {
               key={s.href}
               href={s.href}
               className="rounded-2xl p-5 text-right block"
-              style={{ background: "white", boxShadow: "0 4px 16px rgba(92,18,27,0.08)" }}
+              style={{ background: "white", boxShadow: "0 4px 16px rgba(14,93,69,0.08)" }}
             >
               <div className="text-3xl mb-2">{s.icon}</div>
               <div className="font-extrabold text-sm" style={{ color: COLORS.ink, fontFamily: "var(--font-cairo)" }}>

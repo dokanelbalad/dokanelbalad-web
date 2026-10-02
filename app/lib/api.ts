@@ -50,6 +50,46 @@ interface ProductsResponse {
   total: number;
 }
 
+/**
+ * خطأ خاص لما الحساب يكون مجمّد (كود 423 من الـ backend) - سواء بسبب عمولة
+ * متأخرة أو مخالفة مشاركة أرقام تواصل أو تجميد يدوي من الإدارة. أي صفحة
+ * بتستخدم دالة محتاجة تسجيل دخول تقدر تمسك الخطأ ده لوحده وتوريه للمستخدم
+ * برسالة واضحة، بدل ما يظهر كـ"حصل خطأ" عام.
+ */
+export class FrozenAccountError extends Error {
+  reason: string;
+
+  constructor(message: string, reason: string) {
+    super(message);
+    this.name = "FrozenAccountError";
+    this.reason = reason;
+  }
+}
+
+/**
+ * نسخة من fetch بتحط التوكن أوتوماتيك وبتفحص حالة "الحساب مجمّد" (423) مركزياً.
+ * أي دالة هنا بتحتاج تسجيل دخول تقدر تستخدمها بدل fetch العادي.
+ */
+async function authFetch(url: string, token: string, options: RequestInit = {}): Promise<Response> {
+  const res = await fetch(url, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (res.status === 423) {
+    const err = await res.json().catch(() => ({}) as any);
+    throw new FrozenAccountError(
+      err.message || "حسابك مجمّد مؤقتاً",
+      err.frozen_reason || "unknown"
+    );
+  }
+
+  return res;
+}
+
 export async function getCategories(): Promise<Category[]> {
   const res = await fetch(`${API_BASE_URL}/categories`, { cache: "no-store" });
   if (!res.ok) return [];
@@ -213,12 +253,9 @@ export async function getProduct(id: number): Promise<Product> {
 }
 
 export async function startConversation(token: string, productId: number) {
-  const res = await fetch(`${API_BASE_URL}/conversations`, {
+  const res = await authFetch(`${API_BASE_URL}/conversations`, token, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ product_id: productId }),
   });
   if (!res.ok) {
@@ -230,8 +267,7 @@ export async function startConversation(token: string, productId: number) {
 }
 
 export async function getMessages(token: string, conversationId: number) {
-  const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
-    headers: { Authorization: `Bearer ${token}` },
+  const res = await authFetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, token, {
     cache: "no-store",
   });
   if (!res.ok) throw new Error("فشل تحميل الرسائل");
@@ -239,18 +275,31 @@ export async function getMessages(token: string, conversationId: number) {
   return json.data;
 }
 
-export async function sendMessage(token: string, conversationId: number, body: string) {
-  const res = await fetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, {
+export interface SendMessageResult {
+  data: any;
+  /** موجودة بس لما الرسالة اتبعتت مع تحذير مشاركة رقم تواصل (المحاولة الأولى أو التانية) */
+  warning?: string;
+}
+
+export async function sendMessage(
+  token: string,
+  conversationId: number,
+  body: string
+): Promise<SendMessageResult> {
+  const res = await authFetch(`${API_BASE_URL}/conversations/${conversationId}/messages`, token, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ body }),
   });
-  if (!res.ok) throw new Error("فشل إرسال الرسالة");
-  const json = await res.json();
-  return json.data;
+
+  const json = await res.json().catch(() => ({}) as any);
+
+  if (!res.ok) {
+    // 422: الرسالة اتمنعت (المحاولة التالتة أو الرابعة لمشاركة رقم)
+    throw new Error(json.message || "فشل إرسال الرسالة");
+  }
+
+  return { data: json.data, warning: json.warning };
 }
 
 export interface CreateOrderPayload {
@@ -261,12 +310,9 @@ export interface CreateOrderPayload {
 }
 
 export async function createOrder(token: string, data: CreateOrderPayload) {
-  const res = await fetch(`${API_BASE_URL}/orders`, {
+  const res = await authFetch(`${API_BASE_URL}/orders`, token, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
   if (!res.ok) {
@@ -308,10 +354,7 @@ interface OrdersResponse {
 }
 
 export async function getMyOrders(token: string): Promise<OrdersResponse> {
-  const res = await fetch(`${API_BASE_URL}/orders`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
+  const res = await authFetch(`${API_BASE_URL}/orders`, token, { cache: "no-store" });
   if (!res.ok) throw new Error("فشل تحميل الطلبات");
   return res.json();
 }
@@ -338,10 +381,7 @@ export interface Conversation {
 }
 
 export async function getConversations(token: string): Promise<Conversation[]> {
-  const res = await fetch(`${API_BASE_URL}/conversations`, {
-    headers: { Authorization: `Bearer ${token}` },
-    cache: "no-store",
-  });
+  const res = await authFetch(`${API_BASE_URL}/conversations`, token, { cache: "no-store" });
   if (!res.ok) throw new Error("فشل تحميل المحادثات");
   const json = await res.json();
   return json.data;
@@ -351,6 +391,8 @@ export interface AdminOverview {
   total_users: number;
   total_vendors: number;
   pending_vendors: number;
+  frozen_accounts: number;
+  offplatform_sales_needing_review: number;
   total_products: number;
   total_orders: number;
   total_pending_commission: number;
@@ -403,6 +445,24 @@ export async function rejectVendor(token: string, id: number) {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error("فشل رفض البائع");
+  return res.json();
+}
+
+export async function blockVendor(token: string, id: number) {
+  const res = await fetch(`${API_BASE_URL}/admin/vendors/${id}/block`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("فشل تجميد الحساب");
+  return res.json();
+}
+
+export async function unblockVendor(token: string, id: number) {
+  const res = await fetch(`${API_BASE_URL}/admin/vendors/${id}/unblock`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("فشل رفع التجميد");
   return res.json();
 }
 
@@ -505,9 +565,8 @@ export async function verifyOtp(email: string, code: string) {
 }
 
 export async function registerVendor(token: string, formData: FormData) {
-  const res = await fetch(`${API_BASE_URL}/vendor/register`, {
+  const res = await authFetch(`${API_BASE_URL}/vendor/register`, token, {
     method: "POST",
-    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
   if (!res.ok) {
@@ -547,10 +606,176 @@ export async function updateProductDiscount(token: string, productId: number, di
   return res.json();
 }
 
-export async function startPayment(token: string, orderId: number): Promise<{ payment_url: string }> {
-  const res = await fetch(`${API_BASE_URL}/orders/${orderId}/pay`, {
+export interface ProductBuyer {
+  id: number; // رقم المحادثة
+  buyer_id: number;
+  last_message_at: string | null;
+  buyer: { id: number; name: string };
+}
+
+export async function getProductBuyers(token: string, productId: number): Promise<ProductBuyer[]> {
+  const res = await authFetch(`${API_BASE_URL}/vendor/products/${productId}/buyers`, token, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("فشل تحميل قايمة المشترين");
+  const json = await res.json();
+  return json.data;
+}
+
+export async function markSoldOffPlatform(
+  token: string,
+  productId: number,
+  data: { sale_price: number; conversation_id: number; note?: string }
+) {
+  const res = await authFetch(`${API_BASE_URL}/vendor/products/${productId}/mark-sold-offplatform`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "فشل تسجيل البيع");
+  }
+  return res.json();
+}
+
+export interface SaleConfirmation {
+  id: number;
+  amount: string;
+  created_at: string;
+  confirmation_deadline: string;
+  vendor: { id: number; store_name: string };
+  conversation: { id: number; product: { id: number; title: string } };
+}
+
+export async function getSaleConfirmations(token: string): Promise<SaleConfirmation[]> {
+  const res = await authFetch(`${API_BASE_URL}/buyer/sale-confirmations`, token, { cache: "no-store" });
+  if (!res.ok) throw new Error("فشل تحميل طلبات التأكيد");
+  const json = await res.json();
+  return json.data;
+}
+
+export async function respondToSaleConfirmation(token: string, id: number, confirm: boolean) {
+  const res = await authFetch(`${API_BASE_URL}/buyer/sale-confirmations/${id}/respond`, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirm }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "فشل إرسال ردك");
+  }
+  return res.json();
+}
+
+export interface FrozenAccount {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  role: "buyer" | "seller" | "admin";
+  frozen_reason: "phone_sharing" | "commission_overdue" | "admin_manual" | null;
+  frozen_until: string | null;
+  permanently_banned: boolean;
+  phone_violation_strikes: number;
+  phone_freeze_count: number;
+  commission_freeze_count: number;
+  updated_at: string;
+  vendorProfile?: { id: number; store_name: string } | null;
+}
+
+export async function getFrozenAccounts(token: string): Promise<FrozenAccount[]> {
+  const res = await fetch(`${API_BASE_URL}/admin/accounts/frozen`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("فشل تحميل الحسابات المجمّدة");
+  const json = await res.json();
+  return json.data;
+}
+
+export async function freezeUserAccount(token: string, userId: number) {
+  const res = await fetch(`${API_BASE_URL}/admin/accounts/${userId}/freeze`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("فشل تجميد الحساب");
+  return res.json();
+}
+
+export async function unfreezeUserAccount(token: string, userId: number) {
+  const res = await fetch(`${API_BASE_URL}/admin/accounts/${userId}/unfreeze`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("فشل رفع التجميد");
+  return res.json();
+}
+
+export interface OffplatformSale {
+  id: number;
+  amount: string;
+  buyer_confirmation: "pending" | "confirmed" | "rejected" | "expired" | "admin_approved" | "dismissed";
+  confirmation_deadline: string;
+  created_at: string;
+  vendor: { id: number; store_name: string; user: { name: string } };
+  conversation: { id: number; buyer: { name: string }; product: { id: number; title: string } };
+}
+
+export async function getOffplatformSalesPendingReview(token: string): Promise<OffplatformSale[]> {
+  const res = await fetch(`${API_BASE_URL}/admin/offplatform-sales/pending-review`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("فشل تحميل البيعات المحتاجة مراجعة");
+  const json = await res.json();
+  return json.data;
+}
+
+export async function getOffplatformSalesPendingIntervention(token: string): Promise<OffplatformSale[]> {
+  const res = await fetch(`${API_BASE_URL}/admin/offplatform-sales/pending-intervention`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("فشل تحميل البيعات المستنية رد المشتري");
+  const json = await res.json();
+  return json.data;
+}
+
+export async function approveOffplatformSaleAdmin(token: string, id: number) {
+  const res = await fetch(`${API_BASE_URL}/admin/offplatform-sales/${id}/approve`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("فشل اعتماد العمولة");
+  return res.json();
+}
+
+export async function dismissOffplatformSaleAdmin(token: string, id: number) {
+  const res = await fetch(`${API_BASE_URL}/admin/offplatform-sales/${id}/dismiss`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("فشل إلغاء العمولة");
+  return res.json();
+}
+
+export async function forceResolveOffplatformSale(token: string, id: number, decision: "approve" | "dismiss") {
+  const res = await fetch(`${API_BASE_URL}/admin/offplatform-sales/${id}/force-resolve`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ decision }),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "فشل التدخل في الحالة");
+  }
+  return res.json();
+}
+
+export async function startPayment(token: string, orderId: number): Promise<{ payment_url: string }> {
+  const res = await authFetch(`${API_BASE_URL}/orders/${orderId}/pay`, token, {
+    method: "POST",
   });
   if (!res.ok) {
     const err = await res.json();
