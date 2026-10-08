@@ -21,6 +21,7 @@ export interface Vendor {
 export interface ProductImage {
   id: number;
   image_path: string;
+  image_url: string | null;
   is_primary: boolean;
 }
 
@@ -159,9 +160,7 @@ export async function loginUser(data: {
 }
 
 export async function getMe(token: string) {
-  const res = await fetch(`${API_BASE_URL}/auth/me`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const res = await authFetch(`${API_BASE_URL}/auth/me`, token);
   if (!res.ok) throw new Error("فشل التحقق من الجلسة");
   return res.json();
 }
@@ -217,21 +216,85 @@ export async function createVendorProduct(
     shipping_paid_by?: "vendor" | "buyer";
     quantity: number;
     governorate: string;
-  }
+  },
+  images?: File[]
 ) {
-  const res = await fetch(`${API_BASE_URL}/vendor/products`, {
+  const formData = new FormData();
+  Object.entries(data).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) formData.append(key, String(value));
+  });
+  (images || []).forEach((file) => formData.append("images[]", file));
+
+  const res = await authFetch(`${API_BASE_URL}/vendor/products`, token, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(data),
+    body: formData,
   });
   if (!res.ok) {
     const err = await res.json();
     throw new Error(err.message || "فشل إضافة المنتج");
   }
   return res.json();
+}
+
+export async function addProductImages(token: string, productId: number, images: File[]) {
+  const formData = new FormData();
+  images.forEach((file) => formData.append("images[]", file));
+
+  const res = await authFetch(`${API_BASE_URL}/vendor/products/${productId}/images`, token, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "فشل إضافة الصور");
+  }
+  return res.json();
+}
+
+export async function deleteProductImage(token: string, productId: number, imageId: number) {
+  const res = await authFetch(`${API_BASE_URL}/vendor/products/${productId}/images/${imageId}`, token, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "فشل حذف الصورة");
+  }
+  return res.json();
+}
+
+export async function updateVendorProduct(
+  token: string,
+  productId: number,
+  data: Partial<{
+    category_id: number;
+    title: string;
+    description: string;
+    condition: "new" | "used" | "like_new";
+    price: number;
+    discount_percentage: number;
+    shipping_fee: number;
+    shipping_paid_by: "vendor" | "buyer";
+    quantity: number;
+    governorate: string;
+  }>
+) {
+  const res = await authFetch(`${API_BASE_URL}/products/${productId}`, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.message || "فشل تعديل المنتج");
+  }
+  return res.json();
+}
+
+export async function getVendorProduct(token: string, productId: number): Promise<Product> {
+  const res = await authFetch(`${API_BASE_URL}/products/${productId}`, token, { cache: "no-store" });
+  if (!res.ok) throw new Error("فشل تحميل المنتج");
+  const json = await res.json();
+  return json.data;
 }
 
 export async function deleteVendorProduct(token: string, productId: number) {

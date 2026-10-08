@@ -39,6 +39,7 @@ export default function ProductPage() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeImage, setActiveImage] = useState(0);
   const [addedToCart, setAddedToCart] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [conversationId, setConversationId] = useState<number | null>(null);
@@ -136,19 +137,62 @@ export default function ProductPage() {
         </button>
 
         <div className="grid md:grid-cols-2 gap-8">
-          <div
-            className="rounded-3xl flex items-center justify-center text-9xl relative"
-            style={{ height: 340, background: `linear-gradient(160deg, ${COLORS.greenMid}, ${COLORS.greenDark})` }}
-          >
-            {Number(product.discount_percentage) > 0 && (
-              <span
-                className="absolute top-3 right-3 px-2.5 py-1.5 rounded-lg text-sm font-bold"
-                style={{ background: COLORS.orange, color: "white" }}
+          <div>
+            {product.images && product.images.length > 0 ? (
+              <>
+                <div
+                  className="rounded-3xl overflow-hidden relative"
+                  style={{ height: 340, background: COLORS.sage }}
+                >
+                  <img
+                    src={product.images[activeImage]?.image_url || product.images[0].image_url || undefined}
+                    alt={product.title}
+                    className="w-full h-full object-cover"
+                  />
+                  {Number(product.discount_percentage) > 0 && (
+                    <span
+                      className="absolute top-3 right-3 px-2.5 py-1.5 rounded-lg text-sm font-bold"
+                      style={{ background: COLORS.orange, color: "white" }}
+                    >
+                      خصم {Number(product.discount_percentage)}%
+                    </span>
+                  )}
+                </div>
+                {product.images.length > 1 && (
+                  <div className="flex gap-2 mt-3 overflow-x-auto">
+                    {product.images.map((img, i) => (
+                      <button
+                        key={img.id}
+                        onClick={() => setActiveImage(i)}
+                        className="shrink-0 rounded-xl overflow-hidden"
+                        style={{
+                          width: 64,
+                          height: 64,
+                          border: `2px solid ${i === activeImage ? COLORS.green : "transparent"}`,
+                        }}
+                      >
+                        <img src={img.image_url || undefined} alt="" className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div
+                className="rounded-3xl flex items-center justify-center text-9xl relative"
+                style={{ height: 340, background: `linear-gradient(160deg, ${COLORS.greenMid}, ${COLORS.greenDark})` }}
               >
-                خصم {Number(product.discount_percentage)}%
-              </span>
+                {Number(product.discount_percentage) > 0 && (
+                  <span
+                    className="absolute top-3 right-3 px-2.5 py-1.5 rounded-lg text-sm font-bold"
+                    style={{ background: COLORS.orange, color: "white" }}
+                  >
+                    خصم {Number(product.discount_percentage)}%
+                  </span>
+                )}
+                {product.category?.icon || "📦"}
+              </div>
             )}
-            {product.category?.icon || "📦"}
           </div>
 
           <div className="text-right space-y-4">
